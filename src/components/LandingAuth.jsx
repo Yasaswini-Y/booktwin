@@ -9,7 +9,7 @@ const topics = [
   "...midnight readers"
 ];
 
-export default function LandingAuth({ onNavigateToAuth }) {
+export default function LandingAuth({ onNavigateToAuth, onNavigateToAbout }) {
   const [index, setIndex] = useState(0);
 
   useEffect(() => {
@@ -29,7 +29,7 @@ export default function LandingAuth({ onNavigateToAuth }) {
           <span>BookTwin</span>
         </div>
         <div className="flex items-center gap-6 font-bold text-sm">
-          <button className="hover:opacity-70 transition-opacity hidden sm:block">Our Story</button>
+          <button onClick={onNavigateToAbout} className="hover:opacity-70 transition-opacity hidden sm:block">Our Story</button>
           <button onClick={() => onNavigateToAuth(true)} className="hover:opacity-70 transition-opacity">Log in</button>
           <button 
             onClick={() => onNavigateToAuth(false)}

@@ -6,6 +6,7 @@ export default function Onboarding({ onComplete }) {
   const [selectedBooks, setSelectedBooks] = useState([]);
   const [selectedGenres, setSelectedGenres] = useState([]);
   const [name, setName] = useState('');
+  const [tagline, setTagline] = useState('');
   const [customBookTitle, setCustomBookTitle] = useState('');
   const [customBookAuthor, setCustomBookAuthor] = useState('');
 
@@ -62,7 +63,8 @@ export default function Onboarding({ onComplete }) {
           avatar: `https://api.dicebear.com/7.x/notionists/svg?seed=${name}`,
           favoriteBooks: selectedBooks,
           favoriteGenres: selectedGenres,
-          bio: "A fellow reader seeking new worlds."
+          tagline: tagline.trim() || "A fellow reader seeking new worlds.",
+          bio: "Just joined BookTwin! I'm excited to connect with other readers."
         })
       });
 
@@ -94,6 +96,17 @@ export default function Onboarding({ onComplete }) {
             placeholder="e.g. Jane Austen"
             value={name}
             onChange={(e) => setName(e.target.value)}
+            className="w-full p-4 rounded-xl border border-leather/20 bg-white/80 focus:bg-white focus:ring-2 focus:ring-accent outline-none transition-all shadow-sm text-lg placeholder:text-ink/30"
+          />
+        </div>
+
+        <div className="space-y-4">
+          <label className="font-bold text-leather text-lg">Tagline (optional)</label>
+          <input 
+            type="text" 
+            placeholder="e.g. Seeking the meaning of life, one book at a time."
+            value={tagline}
+            onChange={(e) => setTagline(e.target.value)}
             className="w-full p-4 rounded-xl border border-leather/20 bg-white/80 focus:bg-white focus:ring-2 focus:ring-accent outline-none transition-all shadow-sm text-lg placeholder:text-ink/30"
           />
         </div>

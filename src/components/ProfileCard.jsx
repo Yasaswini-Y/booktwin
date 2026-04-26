@@ -43,7 +43,7 @@ export default function ProfileCard({ user, onSkip, onConnect }) {
       </div>
       
       <div className="p-6">
-        <p className="text-ink/80 italic mb-6 font-medium">"{user.bio}"</p>
+        <p className="text-ink/80 italic mb-6 font-medium">"{user.tagline || user.bio || "A fellow reader seeking new worlds."}"</p>
         
         <div className="space-y-4">
           <div>

@@ -24,11 +24,21 @@ const userSchema = new mongoose.Schema({
   avatar: {
     type: String,
   },
+  tagline: {
+    type: String,
+  },
   bio: {
     type: String,
   },
   favoriteBooks: [bookSchema],
-  favoriteGenres: [String]
+  favoriteGenres: [String],
+  isEmailVerified: {
+    type: Boolean,
+    default: false
+  },
+  emailVerificationToken: String,
+  resetPasswordToken: String,
+  resetPasswordExpires: Date
 }, {
   timestamps: true
 });

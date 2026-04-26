@@ -1,6 +1,9 @@
 import express from 'express';
+import { createServer } from 'http';
+import { Server } from 'socket.io';
 import cors from 'cors';
 import dotenv from 'dotenv';
+import crypto from 'crypto';
 import connectDB from './config/db.js';
 import User from './models/User.js';
 import Message from './models/Message.js';
@@ -13,8 +16,38 @@ dotenv.config();
 connectDB();
 
 const app = express();
+const httpServer = createServer(app);
+const io = new Server(httpServer, {
+  cors: {
+    origin: 'http://localhost:5173',
+    methods: ['GET', 'POST', 'PUT']
+  }
+});
+
 app.use(cors());
 app.use(express.json());
+
+// Socket.io user tracking
+const userSocketMap = new Map();
+
+io.on('connection', (socket) => {
+  console.log(`Socket connected: ${socket.id}`);
+
+  socket.on('add_user', (userId) => {
+    userSocketMap.set(userId, socket.id);
+    console.log(`User ${userId} mapped to socket ${socket.id}`);
+  });
+
+  socket.on('disconnect', () => {
+    for (const [userId, socketId] of userSocketMap.entries()) {
+      if (socketId === socket.id) {
+        userSocketMap.delete(userId);
+        console.log(`User ${userId} disconnected`);
+        break;
+      }
+    }
+  });
+});
 
 // Jaccard Similarity Logic
 const calculateJaccardSimilarity = (listA, listB) => {
@@ -68,22 +101,104 @@ app.post('/api/auth/register', async (req, res) => {
     const salt = await bcrypt.genSalt(10);
     const hashedPassword = await bcrypt.hash(password, salt);
 
+    const emailVerificationToken = crypto.randomBytes(32).toString('hex');
+
     const user = await User.create({
       email,
       password: hashedPassword,
+      emailVerificationToken,
     });
     
-    console.log("Registered User:", user);
+    console.log("Registered User:", user.email);
+    console.log(`\n===== MOCK EMAIL =====`);
+    console.log(`To: ${email}`);
+    console.log(`Subject: Verify your BookTwin email`);
+    console.log(`Click to verify -> http://localhost:5173/#/verify-email/${emailVerificationToken}`);
+    console.log(`======================\n`);
 
     res.status(201).json({
       _id: user._id,
       email: user.email,
       token: generateToken(user._id),
+      message: 'Registration successful! Please check the backend console for your email verification link.',
     });
   } catch (error) {
     if (error.code === 11000) {
       return res.status(400).json({ message: 'Email already exists' });
     }
+    res.status(500).json({ message: error.message });
+  }
+});
+
+// EMAIL VERIFICATION
+app.get('/api/auth/verify/:token', async (req, res) => {
+  try {
+    const user = await User.findOne({ emailVerificationToken: req.params.token });
+
+    if (!user) {
+      return res.status(400).json({ message: 'Invalid or expired verification token.' });
+    }
+
+    user.isEmailVerified = true;
+    user.emailVerificationToken = undefined;
+    await user.save();
+
+    console.log(`Email verified for user: ${user.email}`);
+    res.json({ message: 'Email verified successfully!' });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+});
+
+// FORGOT PASSWORD
+app.post('/api/auth/forgot-password', async (req, res) => {
+  try {
+    const { email } = req.body;
+    const user = await User.findOne({ email });
+
+    if (!user) {
+      return res.status(404).json({ message: 'No account found with that email.' });
+    }
+
+    const resetToken = crypto.randomBytes(32).toString('hex');
+    user.resetPasswordToken = resetToken;
+    user.resetPasswordExpires = Date.now() + 3600000; // 1 hour
+    await user.save();
+
+    console.log(`\n===== MOCK EMAIL =====`);
+    console.log(`To: ${email}`);
+    console.log(`Subject: Reset your BookTwin password`);
+    console.log(`Click to reset -> http://localhost:5173/#/reset-password/${resetToken}`);
+    console.log(`======================\n`);
+
+    res.json({ message: 'Password reset link sent! Check the backend terminal console.' });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+});
+
+// RESET PASSWORD
+app.post('/api/auth/reset-password/:token', async (req, res) => {
+  try {
+    const user = await User.findOne({
+      resetPasswordToken: req.params.token,
+      resetPasswordExpires: { $gt: Date.now() }
+    });
+
+    if (!user) {
+      return res.status(400).json({ message: 'Invalid or expired reset token.' });
+    }
+
+    const { password } = req.body;
+    const salt = await bcrypt.genSalt(10);
+    user.password = await bcrypt.hash(password, salt);
+    user.resetPasswordToken = undefined;
+    user.resetPasswordExpires = undefined;
+    await user.save();
+
+    console.log(`Password reset successful for user: ${user.email}`);
+    res.json({ message: 'Password has been reset successfully!' });
+  } catch (error) {
     res.status(500).json({ message: error.message });
   }
 });
@@ -125,14 +240,15 @@ app.get('/api/profile', protect, async (req, res) => {
 
 app.put('/api/profile', protect, async (req, res) => {
   try {
-    const { name, avatar, bio, favoriteBooks, favoriteGenres } = req.body;
+    const { name, avatar, bio, tagline, favoriteBooks, favoriteGenres } = req.body;
 
     const user = await User.findById(req.user._id);
 
     if (user) {
-      user.name = name || user.name;
-      user.avatar = avatar || user.avatar;
-      user.bio = bio || user.bio;
+      user.name = name !== undefined ? name : user.name;
+      user.avatar = avatar !== undefined ? avatar : user.avatar;
+      user.bio = bio !== undefined ? bio : user.bio;
+      user.tagline = tagline !== undefined ? tagline : user.tagline;
       user.favoriteBooks = favoriteBooks || user.favoriteBooks;
       user.favoriteGenres = favoriteGenres || user.favoriteGenres;
 
@@ -188,6 +304,19 @@ app.post('/api/messages', protect, async (req, res) => {
       content,
     });
 
+    // Send real-time notification if receiver is online
+    const receiverSocketId = userSocketMap.get(receiverId);
+    if (receiverSocketId) {
+      const senderName = req.user.name || req.user.email;
+      const messagePreview = content.length > 50 ? content.substring(0, 50) + '...' : content;
+      io.to(receiverSocketId).emit('new_message_notification', {
+        senderName,
+        messagePreview,
+        senderId: req.user._id.toString(),
+      });
+      console.log(`Notification sent to ${receiverId} from ${senderName}`);
+    }
+
     res.status(201).json(message);
   } catch (error) {
     res.status(500).json({ message: error.message });
@@ -213,4 +342,4 @@ app.get('/api/messages/:userId', protect, async (req, res) => {
 });
 
 const PORT = process.env.PORT || 5000;
-app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
+httpServer.listen(PORT, () => console.log(`Server running on port ${PORT}`));

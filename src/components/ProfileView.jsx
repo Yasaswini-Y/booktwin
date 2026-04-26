@@ -1,7 +1,7 @@
 import React from 'react';
-import { ArrowLeft, BookOpen, Star } from 'lucide-react';
+import { ArrowLeft, BookOpen, Star, Pencil } from 'lucide-react';
 
-export default function ProfileView({ user, onBack }) {
+export default function ProfileView({ user, onBack, onEdit }) {
   if (!user) return null;
 
   return (
@@ -14,7 +14,7 @@ export default function ProfileView({ user, onBack }) {
         />
         <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent flex flex-col justify-end p-6">
           <h1 className="text-3xl font-extrabold text-white drop-shadow-md">{user.name}</h1>
-          <p className="text-white/80 font-medium text-sm mt-1">{user.bio || "A fellow reader seeking new worlds."}</p>
+          <p className="text-white/80 font-medium text-sm mt-1">{user.tagline || "A fellow reader seeking new worlds."}</p>
         </div>
         
         <button 
@@ -23,9 +23,25 @@ export default function ProfileView({ user, onBack }) {
         >
           <ArrowLeft className="w-5 h-5" />
         </button>
+        <button 
+          onClick={onEdit}
+          className="absolute top-4 right-4 w-10 h-10 rounded-full bg-black/30 backdrop-blur-md flex items-center justify-center text-white hover:bg-black/50 transition-colors border border-white/20"
+        >
+          <Pencil className="w-4 h-4" />
+        </button>
       </div>
 
       <div className="p-6 space-y-8">
+        {user.bio && (
+          <section>
+            <div className="flex items-center gap-2 mb-4 text-leather">
+              <BookOpen className="w-5 h-5 text-accent" />
+              <h2 className="text-xl font-bold">About Me</h2>
+            </div>
+            <p className="text-ink/80 leading-relaxed bg-parchment/30 p-4 rounded-xl border border-leather/5">{user.bio}</p>
+          </section>
+        )}
+
         <section>
           <div className="flex items-center gap-2 mb-4 text-leather">
             <Star className="w-5 h-5 text-accent" fill="currentColor" />
